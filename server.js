@@ -10,10 +10,10 @@ var cors = require('cors');
 
 var app = express();
 
-// Basic Configuration 
+// Basic Configuration
 var port = process.env.PORT || 3000;
 
-/** this project needs a db !! **/ 
+/** this project needs a db !! **/
 // mongoose.connect(process.env.MONGOLAB_URI);
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true });
 
@@ -29,10 +29,7 @@ app.get('/', function(req, res){
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-let urlCounter = 0;
-
-// mongo
-
+// mongo stuff
 var Schema = mongoose.Schema;
 
 var urlSchema = new Schema({
@@ -48,6 +45,22 @@ var urlSchema = new Schema({
 
 var Link = mongoose.model('Link', urlSchema);
 
+// checking db for present links
+let urlCounter = 1;
+
+let checkDB = function(done) {
+  Link.find().sort({ short_url: -1 }).exec(function (err, data) {
+    if (err) {
+      done(err);
+    };
+    if (typeof data[0] != "undefined") {
+      urlCounter = data[0].short_url + 1;
+    } else {
+      urlCounter = 1;
+    }
+  });
+};
+
 // API endpoint
 app.post("/api/shorturl/new", function (request, response) {
   let myUrl = request.body.url;
@@ -60,14 +73,16 @@ app.post("/api/shorturl/new", function (request, response) {
     if (err) {
       console.error(err);
     }
-    if (address != undefined) {
-      urlCounter += 1;
-      Link.create({"original_url":request.body.url, "short_url":urlCounter}, function (err) {
-        if (err) {
-          return err;
-        }
-      });
-      response.json({"original_url":request.body.url, "short_url":urlCounter});
+    if (typeof address != "undefined") {
+      checkDB();
+      setTimeout(function(){
+        Link.create({"original_url":myUrl, "short_url":urlCounter}, function (err) {
+          if (err) {
+            return err;
+          }
+        });
+        response.json({"original_url":request.body.url, "short_url":urlCounter});
+      }, 500);
     } else {
       response.json({"error":"invalid URL"});
     }
@@ -76,17 +91,16 @@ app.post("/api/shorturl/new", function (request, response) {
 
 
 app.get("/api/shorturl/:number", function (request, response) {
-  Link.findOne({ short_url: request.params.number }, function (err, adventure) {
+  Link.findOne({ short_url: request.params.number }, function (err, data) {
     if (err) {
       return err;
     }
-    if (adventure != null) {
-      response.status(301).redirect(adventure.original_url);
+    if (data != null) {
+      response.status(301).redirect("http://" + data.original_url);
     } else {
       response.json({"error":"invalid URL"});
     }
   });
-
 });
 
 app.listen(port, function () {
