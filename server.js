@@ -64,19 +64,24 @@ let checkDB = function(done) {
 // API endpoint
 app.post("/api/shorturl/new", function (request, response) {
   let myUrl = request.body.url;
+  let myPath = "";
   let firstIndex = myUrl.indexOf('//');
-  if (firstIndex != -1)
-  {
+  if (firstIndex != -1) {
     myUrl = myUrl.substring(firstIndex + 2, myUrl.length);
   };
-  dns.lookup(myUrl, function (err, address) {
+  let secondIndex = myUrl.indexOf('/');
+  if (secondIndex != -1) {
+    myPath = myUrl.substring(secondIndex, myUrl.length);
+    myUrl = myUrl.substring(0, secondIndex);
+  }
+  dns.lookup(myUrl, { path: myPath }, function (err, address) {
     if (err) {
       console.error(err);
     }
     if (typeof address != "undefined") {
       checkDB();
       setTimeout(function(){
-        Link.create({"original_url":myUrl, "short_url":urlCounter}, function (err) {
+        Link.create({"original_url":request.body.url, "short_url":urlCounter}, function (err) {
           if (err) {
             return err;
           }
@@ -88,7 +93,6 @@ app.post("/api/shorturl/new", function (request, response) {
     }
   });
 });
-
 
 app.get("/api/shorturl/:number", function (request, response) {
   Link.findOne({ short_url: request.params.number }, function (err, data) {
